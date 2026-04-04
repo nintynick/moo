@@ -1,0 +1,17 @@
+# GitSpoke Reference Eval Harness
+# This Dockerfile demonstrates the eval container contract.
+# The eval command must print the metric value as the last line of stdout.
+
+FROM python:3.11-slim
+
+WORKDIR /workspace
+
+# Install dependencies if requirements.txt exists
+COPY requirements.txt* ./
+RUN pip install --no-cache-dir -r requirements.txt 2>/dev/null || true
+
+# Copy project files
+COPY . .
+
+# Default: run the eval script
+CMD ["python", "run_eval.py"]
