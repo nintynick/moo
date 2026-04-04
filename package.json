@@ -1,0 +1,27 @@
+{
+  "name": "gitspoke",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A multiplayer, eval-driven code evolution platform. Like GitHub, but branches compete on a leaderboard instead of merging to main.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:eval-runner\"",
+    "dev:api": "npm -w packages/api run dev",
+    "dev:web": "npm -w packages/web run dev",
+    "dev:eval-runner": "npm -w packages/eval-runner run dev",
+    "build": "npm run build --workspaces",
+    "lint": "eslint 'packages/*/src/**/*.ts'",
+    "test": "vitest run",
+    "db:migrate": "npm -w packages/api run db:migrate",
+    "db:seed": "npm -w packages/api run db:seed"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "concurrently": "^9.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

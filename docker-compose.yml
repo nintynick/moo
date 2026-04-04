@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - GITSPOKE_DB_PATH=/data/gitspoke.db
+    volumes:
+      - db-data:/data
+      - git-repos:/var/gitspoke/repos
+
+  git-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.git-server
+    ports:
+      - "3001:3001"
+    environment:
+      - GIT_SERVER_PORT=3001
+      - GIT_REPOS_PATH=/var/gitspoke/repos
+      - GITSPOKE_API_URL=http://api:3000
+    volumes:
+      - git-repos:/var/gitspoke/repos
+
+  eval-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.eval-runner
+    environment:
+      - GITSPOKE_API_URL=http://api:3000
+      - GIT_REPOS_PATH=/var/gitspoke/repos
+      - MAX_CONCURRENT=2
+    volumes:
+      - git-repos:/var/gitspoke/repos
+      - /var/run/docker.sock:/var/run/docker.sock  # Needed to spawn eval containers
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+
+volumes:
+  db-data:
+  git-repos:

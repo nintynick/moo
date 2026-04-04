@@ -1,0 +1,15 @@
+version: 1
+suites:
+  - name: sort-benchmark
+    command: python eval.py
+    image: python:3.12-slim
+    timeout: 60
+    metrics:
+      - name: median_ms
+        direction: minimize
+        unit: ms
+      - name: p95_ms
+        direction: minimize
+        unit: ms
+      - name: correct
+        direction: maximize
