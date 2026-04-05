@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitSpoke</title>
+<style>
+:root {
+  --ink: #111827; --ink-soft: #374151; --ink-muted: #6B7280;
+  --accent: #4338CA; --accent-light: #EEF2FF; --accent-mid: #C7D2FE;
+  --surface: #FAFAF9; --white: #FFFFFF; --border: #E5E7EB;
+  --green: #059669; --green-bg: #ECFDF5;
+  --red: #DC2626; --red-bg: #FEF2F2;
+  --yellow: #D97706; --yellow-bg: #FFFBEB;
+  --radius: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--surface); color: var(--ink); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Layout ── */
+.shell { display: flex; min-height: 100vh; }
+nav.sidebar {
+  width: 240px; background: var(--white); border-right: 1px solid var(--border);
+  padding: 1.5rem 1rem; flex-shrink: 0; position: sticky; top: 0; height: 100vh;
+  overflow-y: auto;
+}
+nav .logo { font-size: 1.4rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+nav .logo span { color: var(--ink); }
+nav .subtitle { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-muted); margin-bottom: 1.5rem; }
+nav .nav-section { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-muted); margin: 1.25rem 0 0.5rem; font-weight: 600; }
+nav ul { list-style: none; }
+nav ul li a {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.75rem;
+  border-radius: 6px; font-size: 0.85rem; color: var(--ink-soft); font-weight: 500;
+  transition: all 0.15s;
+}
+nav ul li a:hover { background: var(--accent-light); color: var(--accent); text-decoration: none; }
+nav ul li a.active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
+nav ul li a .icon { font-size: 1rem; width: 1.25rem; text-align: center; }
+
+main.content { flex: 1; padding: 2rem 2.5rem; max-width: 1100px; }
+main h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 0.5rem; }
+main .page-desc { color: var(--ink-muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+
+/* ── Cards ── */
+.card {
+  background: var(--white); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1.25rem; margin-bottom: 1rem;
+}
+.card h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.75rem; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.stat-card {
+  background: var(--white); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+}
+.stat-card .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); font-weight: 600; }
+.stat-card .value { font-size: 1.75rem; font-weight: 700; color: var(--ink); margin-top: 0.25rem; }
+.stat-card .detail { font-size: 0.78rem; color: var(--ink-muted); margin-top: 0.15rem; }
+
+/* ── Tables ── */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+thead th {
+  background: var(--accent); color: var(--white); font-weight: 600; text-align: left;
+  padding: 0.6rem 0.8rem; white-space: nowrap;
+}
+thead th:first-child { border-radius: 7px 0 0 0; }
+thead th:last-child { border-radius: 0 7px 0 0; }
+tbody td { padding: 0.55rem 0.8rem; border-top: 1px solid var(--border); vertical-align: middle; }
+tbody tr:hover td { background: var(--accent-light); }
+.mono { font-family: 'SF Mono', 'Consolas', monospace; font-size: 0.8rem; }
+.badge {
+  display: inline-block; padding: 0.15rem 0.5rem; border-radius: 10px;
+  font-size: 0.72rem; font-weight: 600;
+}
+.badge-green { background: var(--green-bg); color: var(--green); }
+.badge-yellow { background: var(--yellow-bg); color: var(--yellow); }
+.badge-red { background: var(--red-bg); color: var(--red); }
+.badge-accent { background: var(--accent-light); color: var(--accent); }
+
+/* ── Graph Viz ── */
+#graph-canvas {
+  width: 100%; height: 500px; background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius); position: relative; overflow: hidden;
+}
+#graph-canvas svg { width: 100%; height: 100%; }
+.graph-node { cursor: pointer; }
+.graph-node circle { fill: var(--accent); stroke: var(--white); stroke-width: 2; transition: r 0.15s; }
+.graph-node circle:hover { r: 8; }
+.graph-node text { font-size: 10px; fill: var(--ink-soft); }
+.graph-edge { stroke: var(--border); stroke-width: 1.5; fill: none; }
+
+/* ── Chart ── */
+.chart-container { position: relative; height: 300px; background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
+.chart-container canvas { width: 100% !important; height: 100% !important; }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 1.25rem; }
+.tab {
+  padding: 0.6rem 1.25rem; font-size: 0.85rem; font-weight: 500; color: var(--ink-muted);
+  cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s;
+}
+.tab:hover { color: var(--ink); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ── Forms ── */
+.form-row { display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: end; flex-wrap: wrap; }
+.form-group { display: flex; flex-direction: column; gap: 0.25rem; }
+.form-group label { font-size: 0.75rem; font-weight: 600; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.form-group select, .form-group input {
+  padding: 0.45rem 0.75rem; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 0.85rem; background: var(--white); color: var(--ink);
+}
+.btn {
+  padding: 0.5rem 1rem; background: var(--accent); color: var(--white); border: none;
+  border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+}
+.btn:hover { opacity: 0.9; }
+.btn-outline { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+
+/* ── Empty state ── */
+.empty { text-align: center; padding: 3rem; color: var(--ink-muted); }
+.empty .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .shell { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--border); }
+  main.content { padding: 1.25rem; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="sidebar">
+    <div class="logo"><span>Git</span>Spoke</div>
+    <div class="subtitle">Eval-Driven Version Control</div>
+
+    <div class="nav-section">Dashboard</div>
+    <ul>
+      <li><a href="#" onclick="showPage('leaderboard')" class="active" data-page="leaderboard"><span class="icon">&#9733;</span> Leaderboard</a></li>
+      <li><a href="#" onclick="showPage('graph')" data-page="graph"><span class="icon">&#9670;</span> Branch Graph</a></li>
+      <li><a href="#" onclick="showPage('timeseries')" data-page="timeseries"><span class="icon">&#9650;</span> Time Series</a></li>
+    </ul>
+
+    <div class="nav-section">Explore</div>
+    <ul>
+      <li><a href="#" onclick="showPage('branches')" data-page="branches"><span class="icon">&#8680;</span> Branches</a></li>
+      <li><a href="#" onclick="showPage('commits')" data-page="commits"><span class="icon">&#8226;</span> Commits</a></li>
+      <li><a href="#" onclick="showPage('repos')" data-page="repos"><span class="icon">&#9744;</span> Repositories</a></li>
+    </ul>
+
+    <div class="nav-section">Platform</div>
+    <ul>
+      <li><a href="#" onclick="showPage('identities')" data-page="identities"><span class="icon">&#9786;</span> Contributors</a></li>
+      <li><a href="#" onclick="showPage('runners')" data-page="runners"><span class="icon">&#9881;</span> Runners</a></li>
+      <li><a href="#" onclick="showPage('challenges')" data-page="challenges"><span class="icon">&#9888;</span> Challenges</a></li>
+      <li><a href="#" onclick="showPage('events')" data-page="events"><span class="icon">&#9889;</span> Events</a></li>
+    </ul>
+  </nav>
+
+  <main class="content">
+    <!-- ════════════ LEADERBOARD ════════════ -->
+    <div id="page-leaderboard" class="page active">
+      <h1>Leaderboard</h1>
+      <p class="page-desc">Global rankings by eval score. The source of truth.</p>
+
+      <div class="form-row" id="lb-controls">
+        <div class="form-group">
+          <label>Metric</label>
+          <input type="text" id="lb-metric" value="accuracy" placeholder="metric name">
+        </div>
+        <div class="form-group">
+          <label>Direction</label>
+          <select id="lb-direction">
+            <option value="higher-is-better">Higher is Better</option>
+            <option value="lower-is-better">Lower is Better</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Limit</label>
+          <input type="number" id="lb-limit" value="25" min="1" max="100" style="width:70px">
+        </div>
+        <button class="btn" onclick="loadLeaderboard()">Refresh</button>
+      </div>
+
+      <div id="lb-stats" class="card-grid"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Rank</th><th>Commit</th><th>Score</th><th>Author</th><th>Branch</th><th>Runs</th></tr>
+          </thead>
+          <tbody id="lb-body"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════ BRANCH GRAPH ════════════ -->
+    <div id="page-graph" class="page" style="display:none">
+      <h1>Branch Graph</h1>
+      <p class="page-desc">DAG visualization of the commit history. No main branch — every branch is a peer.</p>
+      <div id="graph-canvas">
+        <svg id="graph-svg"></svg>
+      </div>
+      <div id="graph-info" class="card" style="margin-top:1rem; display:none">
+        <h2>Commit Details</h2>
+        <div id="graph-info-content"></div>
+      </div>
+    </div>
+
+    <!-- ════════════ TIME SERIES ════════════ -->
+    <div id="page-timeseries" class="page" style="display:none">
+      <h1>Score Time Series</h1>
+      <p class="page-desc">The autoresearch staircase — best score over time.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Metric</label>
+          <input type="text" id="ts-metric" value="accuracy" placeholder="metric name">
+        </div>
+        <div class="form-group">
+          <label>Direction</label>
+          <select id="ts-direction">
+            <option value="higher-is-better">Higher is Better</option>
+            <option value="lower-is-better">Lower is Better</option>
+          </select>
+        </div>
+        <button class="btn" onclick="loadTimeSeries()">Refresh</button>
+      </div>
+      <div class="chart-container" style="margin-top:1rem">
+        <canvas id="ts-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- ════════════ BRANCHES ════════════ -->
+    <div id="page-branches" class="page" style="display:none">
+      <h1>Branches</h1>
+      <p class="page-desc">All branches in the repository.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Tip Commit</th><th>Created By</th><th>Forked From</th><th>Created</th></tr></thead>
+          <tbody id="branches-body"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════ COMMITS ════════════ -->
+    <div id="page-commits" class="page" style="display:none">
+      <h1>Recent Commits</h1>
+      <p class="page-desc">Latest commits across all branches.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Message</th><th>Author</th><th>Type</th><th>Branch</th><th>Created</th></tr></thead>
+          <tbody id="commits-body"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════ REPOS ════════════ -->
+    <div id="page-repos" class="page" style="display:none">
+      <h1>Repositories</h1>
+      <p class="page-desc">All eval-driven repositories on the platform.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Description</th><th>Owner</th><th>Manifest Version</th><th>Created</th></tr></thead>
+          <tbody id="repos-body"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════ CONTRIBUTORS ════════════ -->
+    <div id="page-identities" class="page" style="display:none">
+      <h1>Contributors</h1>
+      <p class="page-desc">Humans and agents ranked by reputation.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Type</th><th>Reputation</th><th>Trust</th><th>Commits</th><th>Leaderboard Positions</th><th>Upstream Credit</th></tr></thead>
+          <tbody id="identities-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════ RUNNERS ════════════ -->
+    <div id="page-runners" class="page" style="display:none">
+      <h1>BYOC Runners</h1>
+      <p class="page-desc">Bring-Your-Own-Compute runners registered on the platform.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Owner</th><th>Status</th><th>GPU</th><th>Memory</th><th>Trusted</th><th>Jobs</th><th>Last Heartbeat</th></tr></thead>
+          <tbody id="runners-body"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════ CHALLENGES ════════════ -->
+    <div id="page-challenges" class="page" style="display:none">
+      <h1>Score Challenges</h1>
+      <p class="page-desc">Community-initiated score disputes and verification results.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Commit</th><th>Original Score</th><th>Verification Score</th><th>Status</th><th>Challenger</th><th>Created</th></tr></thead>
+          <tbody id="challenges-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════ EVENTS ════════════ -->
+    <div id="page-events" class="page" style="display:none">
+      <h1>Event Stream</h1>
+      <p class="page-desc">Real-time platform events.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Type</th><th>Repository</th><th>Details</th><th>Time</th></tr></thead>
+          <tbody id="events-body"><tr><td colspan="4" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const API = '/api';
+
+// ── Navigation ──
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  const page = document.getElementById('page-' + name);
+  if (page) page.style.display = 'block';
+  const link = document.querySelector(`nav a[data-page="${name}"]`);
+  if (link) link.classList.add('active');
+  // Load data for the page
+  loaders[name]?.();
+}
+
+function short(id) { return id ? id.substring(0, 12) : '-'; }
+function fmtDate(d) {
+  if (!d) return '-';
+  const dt = new Date(d);
+  return dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+function fmtScore(v) { return typeof v === 'number' ? v.toFixed(6) : '-'; }
+
+async function fetchJSON(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) return null;
+  return resp.json();
+}
+
+// ── Leaderboard ──
+async function loadLeaderboard() {
+  const metric = document.getElementById('lb-metric').value;
+  const direction = document.getElementById('lb-direction').value;
+  const limit = document.getElementById('lb-limit').value;
+  const data = await fetchJSON(`${API}/leaderboard?metric=${metric}&direction=${direction}&limit=${limit}`);
+  const tbody = document.getElementById('lb-body');
+
+  if (!data || !data.entries || data.entries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="icon">&#9733;</div>No scores yet. Push commits and run evals to populate the leaderboard.</div></td></tr>';
+    document.getElementById('lb-stats').innerHTML = '';
+    return;
+  }
+
+  const entries = data.entries;
+  const best = entries[0];
+  const scores = entries.map(e => e.best_score);
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const authors = new Set(entries.map(e => e.author));
+
+  document.getElementById('lb-stats').innerHTML = `
+    <div class="stat-card"><div class="label">Best Score</div><div class="value">${fmtScore(best.best_score)}</div><div class="detail">by ${best.author}</div></div>
+    <div class="stat-card"><div class="label">Entries</div><div class="value">${entries.length}</div><div class="detail">${authors.size} contributors</div></div>
+    <div class="stat-card"><div class="label">Average</div><div class="value">${fmtScore(avg)}</div><div class="detail">across all commits</div></div>
+    <div class="stat-card"><div class="label">Metric</div><div class="value" style="font-size:1.1rem">${metric}</div><div class="detail">${direction}</div></div>
+  `;
+
+  tbody.innerHTML = entries.map(e => `
+    <tr>
+      <td><strong>${e.rank}</strong></td>
+      <td><span class="mono">${short(e.commit_id)}</span></td>
+      <td><strong>${fmtScore(e.best_score)}</strong></td>
+      <td>${e.author}</td>
+      <td><span class="badge badge-accent">${e.branch_name}</span></td>
+      <td>${e.run_count}</td>
+    </tr>
+  `).join('');
+}
+
+// ── Branch Graph ──
+async function loadGraph() {
+  const data = await fetchJSON(`${API}/graph?limit=200`);
+  if (!data || !data.nodes || data.nodes.length === 0) {
+    document.getElementById('graph-canvas').innerHTML = '<div class="empty" style="padding-top:200px"><div class="icon">&#9670;</div>No commits yet.</div>';
+    return;
+  }
+
+  const svg = document.getElementById('graph-svg');
+  svg.innerHTML = '';
+  const W = svg.parentElement.clientWidth;
+  const H = svg.parentElement.clientHeight;
+
+  const nodes = data.nodes;
+  const edges = data.edges;
+  const nodeMap = {};
+
+  // Assign positions: group by branch, time flows left to right
+  const branches = [...new Set(nodes.map(n => n.branch))];
+  const branchColors = {};
+  const palette = ['#4338CA','#059669','#DC2626','#D97706','#7C3AED','#0891B2','#BE185D','#65A30D'];
+  branches.forEach((b, i) => branchColors[b] = palette[i % palette.length]);
+
+  // Sort nodes by creation time
+  nodes.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  const xStep = Math.max(40, (W - 100) / Math.max(nodes.length, 1));
+  const yGap = Math.max(50, (H - 80) / Math.max(branches.length, 1));
+
+  nodes.forEach((n, i) => {
+    const bIdx = branches.indexOf(n.branch);
+    n.x = 60 + i * xStep;
+    n.y = 40 + bIdx * yGap;
+    nodeMap[n.id] = n;
+  });
+
+  // Draw edges
+  edges.forEach(e => {
+    const src = nodeMap[e.source];
+    const tgt = nodeMap[e.target];
+    if (!src || !tgt) return;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const dx = tgt.x - src.x;
+    const dy = tgt.y - src.y;
+    line.setAttribute('d', `M${src.x},${src.y} C${src.x+dx*0.5},${src.y} ${tgt.x-dx*0.5},${tgt.y} ${tgt.x},${tgt.y}`);
+    line.setAttribute('class', 'graph-edge');
+    line.setAttribute('stroke', branchColors[tgt.branch] || '#ccc');
+    line.setAttribute('opacity', '0.4');
+    svg.appendChild(line);
+  });
+
+  // Draw nodes
+  nodes.forEach(n => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'graph-node');
+    g.setAttribute('transform', `translate(${n.x},${n.y})`);
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('r', '6');
+    circle.setAttribute('fill', branchColors[n.branch] || '#4338CA');
+    g.appendChild(circle);
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('y', '-12');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('font-size', '9');
+    text.setAttribute('fill', '#6B7280');
+    text.textContent = n.message.substring(0, 20);
+    g.appendChild(text);
+
+    g.addEventListener('click', () => showGraphInfo(n));
+    svg.appendChild(g);
+  });
+
+  // Branch labels
+  branches.forEach((b, i) => {
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', '8');
+    text.setAttribute('y', 40 + i * yGap + 4);
+    text.setAttribute('font-size', '11');
+    text.setAttribute('font-weight', '600');
+    text.setAttribute('fill', branchColors[b]);
+    text.textContent = b;
+    svg.appendChild(text);
+  });
+}
+
+function showGraphInfo(node) {
+  const el = document.getElementById('graph-info');
+  el.style.display = 'block';
+  document.getElementById('graph-info-content').innerHTML = `
+    <p><strong>Commit:</strong> <span class="mono">${node.id}</span></p>
+    <p><strong>Branch:</strong> ${node.branch}</p>
+    <p><strong>Author:</strong> ${node.author}</p>
+    <p><strong>Message:</strong> ${node.message}</p>
+    <p><strong>Date:</strong> ${fmtDate(node.created_at)}</p>
+  `;
+}
+
+// ── Time Series ──
+async function loadTimeSeries() {
+  const metric = document.getElementById('ts-metric').value;
+  const direction = document.getElementById('ts-direction').value;
+  const data = await fetchJSON(`${API}/leaderboard/time-series?metric=${metric}&direction=${direction}`);
+  const canvas = document.getElementById('ts-canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Set canvas resolution
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width - 32;
+  canvas.height = rect.height - 32;
+
+  if (!data || !data.series || data.series.length === 0) {
+    ctx.fillStyle = '#6B7280';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No data yet', canvas.width / 2, canvas.height / 2);
+    return;
+  }
+
+  const series = data.series;
+  const scores = series.map(s => s.score);
+  const minS = Math.min(...scores);
+  const maxS = Math.max(...scores);
+  const range = maxS - minS || 1;
+
+  const pad = { top: 30, right: 30, bottom: 40, left: 60 };
+  const w = canvas.width - pad.left - pad.right;
+  const h = canvas.height - pad.top - pad.bottom;
+
+  // Background
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Grid lines
+  ctx.strokeStyle = '#E5E7EB';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.top + (h * i / 5);
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + w, y); ctx.stroke();
+    ctx.fillStyle = '#6B7280'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+    const val = maxS - (range * i / 5);
+    ctx.fillText(val.toFixed(4), pad.left - 8, y + 3);
+  }
+
+  // Staircase line
+  ctx.strokeStyle = '#4338CA';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  series.forEach((s, i) => {
+    const x = pad.left + (w * i / Math.max(series.length - 1, 1));
+    const y = pad.top + h - (h * (s.score - minS) / range);
+    if (i === 0) ctx.moveTo(x, y);
+    else {
+      // Staircase: horizontal then vertical
+      const prevX = pad.left + (w * (i - 1) / Math.max(series.length - 1, 1));
+      ctx.lineTo(x, pad.top + h - (h * (series[i-1].score - minS) / range));
+      ctx.lineTo(x, y);
+    }
+  });
+  ctx.stroke();
+
+  // Points
+  series.forEach((s, i) => {
+    const x = pad.left + (w * i / Math.max(series.length - 1, 1));
+    const y = pad.top + h - (h * (s.score - minS) / range);
+    ctx.fillStyle = '#4338CA';
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+    // Label
+    ctx.fillStyle = '#374151'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(s.author, x, y - 10);
+  });
+
+  // Title
+  ctx.fillStyle = '#111827'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(`${metric} over time (${direction})`, pad.left, 16);
+}
+
+// ── Data loaders for other pages ──
+async function loadBranches() {
+  const data = await fetchJSON(`${API}/branches`);
+  const tbody = document.getElementById('branches-body');
+  if (!data || !data.branches || data.branches.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="icon">&#8680;</div>No branches yet.</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.branches.map(b => `
+    <tr>
+      <td><strong>${b.name}</strong></td>
+      <td><span class="mono">${short(b.tip_commit_id)}</span></td>
+      <td>${b.created_by}</td>
+      <td>${b.forked_from_commit ? '<span class="mono">' + short(b.forked_from_commit) + '</span>' : '-'}</td>
+      <td>${fmtDate(b.created_at)}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadCommits() {
+  // Fetch via branches and collect commits
+  const brData = await fetchJSON(`${API}/branches`);
+  const tbody = document.getElementById('commits-body');
+  if (!brData || !brData.branches || brData.branches.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="icon">&#8226;</div>No commits yet.</div></td></tr>';
+    return;
+  }
+
+  // Fetch graph data which has all commits
+  const graphData = await fetchJSON(`${API}/graph?limit=100`);
+  if (!graphData || !graphData.nodes || graphData.nodes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty">No commits.</div></td></tr>';
+    return;
+  }
+
+  const nodes = graphData.nodes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  tbody.innerHTML = nodes.slice(0, 50).map(n => `
+    <tr>
+      <td><span class="mono">${short(n.id)}</span></td>
+      <td>${n.message}</td>
+      <td>${n.author}</td>
+      <td><span class="badge badge-accent">${n.author_type || 'human'}</span></td>
+      <td><span class="badge badge-accent">${n.branch}</span></td>
+      <td>${fmtDate(n.created_at)}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadRepos() {
+  const data = await fetchJSON(`${API}/repos`);
+  const tbody = document.getElementById('repos-body');
+  if (!data || !data.repos || data.repos.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="icon">&#9744;</div>No repositories yet.</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.repos.map(r => `
+    <tr>
+      <td><strong>${r.name}</strong></td>
+      <td>${r.description || '-'}</td>
+      <td>${r.owner_id}</td>
+      <td>${r.manifest_version || '-'}</td>
+      <td>${fmtDate(r.created_at)}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadIdentities() {
+  const data = await fetchJSON(`${API}/identities`);
+  const tbody = document.getElementById('identities-body');
+  if (!data || !data.identities || data.identities.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="icon">&#9786;</div>No contributors yet.</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.identities.map(i => `
+    <tr>
+      <td><strong>${i.display_name}</strong></td>
+      <td><span class="badge ${i.identity_type === 'agent' ? 'badge-accent' : 'badge-green'}">${i.identity_type}</span></td>
+      <td>${i.reputation_score.toFixed(1)}</td>
+      <td>${(i.trust_score * 100).toFixed(0)}%</td>
+      <td>${i.total_commits}</td>
+      <td>${i.leaderboard_positions}</td>
+      <td>${i.upstream_credits.toFixed(2)}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadRunners() {
+  const data = await fetchJSON(`${API}/runners`);
+  const tbody = document.getElementById('runners-body');
+  if (!data || !data.runners || data.runners.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty"><div class="icon">&#9881;</div>No runners registered.</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.runners.map(r => {
+    const statusClass = r.status === 'online' ? 'badge-green' : r.status === 'busy' ? 'badge-yellow' : 'badge-red';
+    return `
+    <tr>
+      <td><strong>${r.name}</strong></td>
+      <td>${r.owner_id}</td>
+      <td><span class="badge ${statusClass}">${r.status}</span></td>
+      <td>${r.gpu_type || '-'}</td>
+      <td>${r.memory || '-'}</td>
+      <td>${r.trusted ? '<span class="badge badge-green">trusted</span>' : '<span class="badge badge-yellow">unverified</span>'}</td>
+      <td>${r.jobs_completed}</td>
+      <td>${r.last_heartbeat ? fmtDate(r.last_heartbeat) : '-'}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadChallenges() {
+  const data = await fetchJSON(`${API}/challenges`);
+  const tbody = document.getElementById('challenges-body');
+  if (!data || !data.challenges || data.challenges.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="icon">&#9888;</div>No challenges yet.</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.challenges.map(c => {
+    const cls = c.status === 'upheld' ? 'badge-green' : c.status === 'overturned' ? 'badge-red' : 'badge-yellow';
+    return `
+    <tr>
+      <td><span class="mono">${short(c.id)}</span></td>
+      <td><span class="mono">${short(c.commit_id)}</span></td>
+      <td>${fmtScore(c.original_score)}</td>
+      <td>${c.verification_score != null ? fmtScore(c.verification_score) : '-'}</td>
+      <td><span class="badge ${cls}">${c.status}</span></td>
+      <td>${c.challenger_id}</td>
+      <td>${fmtDate(c.created_at)}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadEvents() {
+  const data = await fetchJSON(`${API}/events`);
+  const tbody = document.getElementById('events-body');
+  if (!data || !data.events || data.events.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4"><div class="empty"><div class="icon">&#9889;</div>No events yet.</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.events.map(e => `
+    <tr>
+      <td><span class="badge badge-accent">${e.event_type}</span></td>
+      <td>${e.repo_id}</td>
+      <td class="mono" style="font-size:0.75rem; max-width:400px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${JSON.stringify(e.payload)}</td>
+      <td>${fmtDate(e.created_at)}</td>
+    </tr>
+  `).join('');
+}
+
+// Page loader registry
+const loaders = {
+  leaderboard: loadLeaderboard,
+  graph: loadGraph,
+  timeseries: loadTimeSeries,
+  branches: loadBranches,
+  commits: loadCommits,
+  repos: loadRepos,
+  identities: loadIdentities,
+  runners: loadRunners,
+  challenges: loadChallenges,
+  events: loadEvents,
+};
+
+// Initial load
+loadLeaderboard();
+</script>
+</body>
+</html>

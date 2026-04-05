@@ -20,46 +20,55 @@ class GraphStore:
         name: str,
         created_by: str,
         forked_from_commit: str | None = None,
+        repo_id: str = "default",
     ) -> Branch:
         branch = Branch(
             name=name,
             created_by=created_by,
             forked_from_commit=forked_from_commit,
             tip_commit_id=forked_from_commit,
+            repo_id=repo_id,
         )
         self.conn.execute(
-            "INSERT INTO branches (id, name, tip_commit_id, created_by, forked_from_commit, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO branches (id, name, tip_commit_id, created_by, forked_from_commit, repo_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 branch.id,
                 branch.name,
                 branch.tip_commit_id,
                 branch.created_by,
                 branch.forked_from_commit,
+                branch.repo_id,
                 branch.created_at.isoformat(),
             ),
         )
         self.conn.commit()
         return branch
 
-    def get_branch(self, name: str) -> Branch | None:
+    def get_branch(self, name: str, repo_id: str = "default") -> Branch | None:
         row = self.conn.execute(
-            "SELECT * FROM branches WHERE name = ?", (name,)
+            "SELECT * FROM branches WHERE name = ? AND repo_id = ?", (name, repo_id)
         ).fetchone()
         if row is None:
             return None
         return self._row_to_branch(row)
 
-    def list_branches(self) -> list[Branch]:
-        rows = self.conn.execute(
-            "SELECT * FROM branches ORDER BY created_at DESC"
-        ).fetchall()
+    def list_branches(self, repo_id: str | None = None) -> list[Branch]:
+        if repo_id:
+            rows = self.conn.execute(
+                "SELECT * FROM branches WHERE repo_id = ? ORDER BY created_at DESC",
+                (repo_id,),
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM branches ORDER BY created_at DESC"
+            ).fetchall()
         return [self._row_to_branch(r) for r in rows]
 
-    def update_branch_tip(self, name: str, commit_id: str) -> None:
+    def update_branch_tip(self, name: str, commit_id: str, repo_id: str = "default") -> None:
         self.conn.execute(
-            "UPDATE branches SET tip_commit_id = ? WHERE name = ?",
-            (commit_id, name),
+            "UPDATE branches SET tip_commit_id = ? WHERE name = ? AND repo_id = ?",
+            (commit_id, name, repo_id),
         )
         self.conn.commit()
 
@@ -68,6 +77,7 @@ class GraphStore:
         source_commit_id: str,
         new_branch_name: str,
         author: str,
+        repo_id: str = "default",
     ) -> Branch:
         commit = self.get_commit(source_commit_id)
         if commit is None:
@@ -76,6 +86,7 @@ class GraphStore:
             name=new_branch_name,
             created_by=author,
             forked_from_commit=source_commit_id,
+            repo_id=repo_id,
         )
 
     # ── Commits ──
@@ -89,8 +100,9 @@ class GraphStore:
         parent_ids: list[str] | None = None,
         author_type: AuthorType = AuthorType.HUMAN,
         metadata: dict | None = None,
+        repo_id: str = "default",
     ) -> Commit:
-        branch = self.get_branch(branch_name)
+        branch = self.get_branch(branch_name, repo_id)
         if branch is None:
             raise ValueError(f"Branch not found: {branch_name}")
 
@@ -114,12 +126,13 @@ class GraphStore:
             message=message,
             tree_hash=tree_hash,
             metadata=metadata or {},
+            repo_id=repo_id,
             created_at=now,
         )
 
         self.conn.execute(
-            "INSERT INTO commits (id, parent_ids, branch_id, author, author_type, message, tree_hash, metadata, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO commits (id, parent_ids, branch_id, author, author_type, message, tree_hash, metadata, repo_id, lineage_group_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 commit.id,
                 json.dumps(commit.parent_ids),
@@ -129,11 +142,13 @@ class GraphStore:
                 commit.message,
                 commit.tree_hash,
                 json.dumps(commit.metadata),
+                commit.repo_id,
+                commit.lineage_group_id,
                 commit.created_at.isoformat(),
             ),
         )
         # Update branch tip
-        self.update_branch_tip(branch_name, commit.id)
+        self.update_branch_tip(branch_name, commit.id, repo_id)
         return commit
 
     def get_commit(self, commit_id: str) -> Commit | None:
@@ -145,10 +160,10 @@ class GraphStore:
         return self._row_to_commit(row)
 
     def list_commits(
-        self, branch_name: str | None = None, limit: int = 50
+        self, branch_name: str | None = None, limit: int = 50, repo_id: str = "default"
     ) -> list[Commit]:
         if branch_name:
-            branch = self.get_branch(branch_name)
+            branch = self.get_branch(branch_name, repo_id)
             if branch is None:
                 return []
             rows = self.conn.execute(
@@ -191,6 +206,31 @@ class GraphStore:
             return None
         return self._row_to_branch(row)
 
+    def get_graph_data(self, repo_id: str = "default", limit: int = 200) -> dict:
+        """Return the full branch graph as nodes and edges for visualization."""
+        commits = self.conn.execute(
+            "SELECT c.id, c.parent_ids, c.branch_id, c.author, c.message, c.created_at, "
+            "b.name as branch_name "
+            "FROM commits c JOIN branches b ON c.branch_id = b.id "
+            "WHERE c.repo_id = ? ORDER BY c.created_at DESC LIMIT ?",
+            (repo_id, limit),
+        ).fetchall()
+
+        nodes = []
+        edges = []
+        for c in commits:
+            nodes.append({
+                "id": c["id"],
+                "author": c["author"],
+                "message": c["message"],
+                "branch": c["branch_name"],
+                "created_at": c["created_at"],
+            })
+            for pid in json.loads(c["parent_ids"]):
+                edges.append({"source": pid, "target": c["id"]})
+
+        return {"nodes": nodes, "edges": edges}
+
     # ── Row mappers ──
 
     @staticmethod
@@ -201,6 +241,7 @@ class GraphStore:
             tip_commit_id=row["tip_commit_id"],
             created_by=row["created_by"],
             forked_from_commit=row["forked_from_commit"],
+            repo_id=row["repo_id"],
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 
@@ -215,5 +256,7 @@ class GraphStore:
             message=row["message"],
             tree_hash=row["tree_hash"],
             metadata=json.loads(row["metadata"]),
+            repo_id=row["repo_id"],
+            lineage_group_id=row["lineage_group_id"],
             created_at=datetime.fromisoformat(row["created_at"]),
         )

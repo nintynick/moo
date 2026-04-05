@@ -117,6 +117,55 @@ class LeaderboardEngine:
             )
         return entries
 
+    def lineage_ranking(
+        self,
+        lineage_group_id: str,
+        metric_name: str,
+        direction: MetricDirection,
+        limit: int = 50,
+    ) -> list[LeaderboardEntry]:
+        """Rank commits within a lineage group."""
+        agg = "MIN" if direction == MetricDirection.LOWER_IS_BETTER else "MAX"
+        order = "ASC" if direction == MetricDirection.LOWER_IS_BETTER else "DESC"
+
+        rows = self.conn.execute(
+            f"""
+            SELECT
+                s.commit_id,
+                {agg}(s.value) AS best_score,
+                COUNT(*) AS run_count,
+                c.author,
+                b.name AS branch_name,
+                c.lineage_group_id
+            FROM scores s
+            JOIN commits c ON s.commit_id = c.id
+            JOIN branches b ON c.branch_id = b.id
+            WHERE s.metric_name = ?
+              AND c.lineage_group_id = ?
+              AND s.constraints_passed = 1
+            GROUP BY s.commit_id
+            ORDER BY best_score {order}
+            LIMIT ?
+            """,
+            (metric_name, lineage_group_id, limit),
+        ).fetchall()
+
+        entries = []
+        for rank, row in enumerate(rows, start=1):
+            entries.append(
+                LeaderboardEntry(
+                    rank=rank,
+                    commit_id=row["commit_id"],
+                    branch_name=row["branch_name"],
+                    author=row["author"],
+                    metric_name=metric_name,
+                    best_score=row["best_score"],
+                    run_count=row["run_count"],
+                    lineage_group=lineage_group_id,
+                )
+            )
+        return entries
+
     def best_fork_point(
         self,
         metric_name: str,

@@ -31,6 +31,36 @@ class EvalRunStatus(str, Enum):
     FAILED = "failed"
 
 
+class RunnerStatus(str, Enum):
+    ONLINE = "online"
+    OFFLINE = "offline"
+    BUSY = "busy"
+
+
+class ChallengeStatus(str, Enum):
+    OPEN = "open"
+    VERIFYING = "verifying"
+    UPHELD = "upheld"
+    OVERTURNED = "overturned"
+    DISMISSED = "dismissed"
+
+
+class EventType(str, Enum):
+    COMMIT_PUSHED = "commit.pushed"
+    EVAL_STARTED = "eval.started"
+    EVAL_COMPLETED = "eval.completed"
+    EVAL_FAILED = "eval.failed"
+    SCORE_RECORDED = "score.recorded"
+    LEADERBOARD_CHANGED = "leaderboard.changed"
+    BRANCH_CREATED = "branch.created"
+    BRANCH_FORKED = "branch.forked"
+    CHALLENGE_OPENED = "challenge.opened"
+    CHALLENGE_RESOLVED = "challenge.resolved"
+    VERIFICATION_COMPLETED = "verification.completed"
+    RUNNER_REGISTERED = "runner.registered"
+    RUNNER_STATUS_CHANGED = "runner.status_changed"
+
+
 # ── Commit ──
 
 
@@ -43,6 +73,8 @@ class Commit(BaseModel):
     message: str
     tree_hash: str
     metadata: dict[str, Any] = Field(default_factory=dict)
+    repo_id: str = "default"
+    lineage_group_id: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @staticmethod
@@ -63,6 +95,7 @@ class Branch(BaseModel):
     tip_commit_id: str | None = None
     created_by: str
     forked_from_commit: str | None = None
+    repo_id: str = "default"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -80,6 +113,7 @@ class Score(BaseModel):
     constraints_passed: bool = True
     execution_log_hash: str | None = None
     signature: str | None = None
+    verified: bool = False
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -91,6 +125,7 @@ class EvalRun(BaseModel):
     commit_id: str
     manifest_version: str
     status: EvalRunStatus = EvalRunStatus.PENDING
+    runner_id: str | None = None
     scores: list[Score] = Field(default_factory=list)
     started_at: datetime | None = None
     completed_at: datetime | None = None
@@ -107,6 +142,114 @@ class LeaderboardEntry(BaseModel):
     metric_name: str
     best_score: float
     run_count: int = 1
+    verified: bool = False
+    lineage_group: str | None = None
+
+
+# ── Repository ──
+
+
+class Repository(BaseModel):
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    name: str
+    description: str = ""
+    owner_id: str
+    manifest_version: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# ── Identity ──
+
+
+class Identity(BaseModel):
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    display_name: str
+    identity_type: AuthorType = AuthorType.HUMAN
+    public_key: str | None = None
+    organization: str | None = None
+    agent_model: str | None = None
+    agent_version: str | None = None
+    reputation_score: float = 0.0
+    trust_score: float = 1.0
+    total_commits: int = 0
+    leaderboard_positions: int = 0
+    upstream_credits: float = 0.0
+    verification_match_rate: float = 1.0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# ── Runner (BYOC) ──
+
+
+class Runner(BaseModel):
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    name: str
+    owner_id: str
+    status: RunnerStatus = RunnerStatus.OFFLINE
+    gpu_type: str | None = None
+    gpu_memory: str | None = None
+    cpu_cores: int | None = None
+    memory: str | None = None
+    public_key: str | None = None
+    trusted: bool = False
+    last_heartbeat: datetime | None = None
+    jobs_completed: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+
+# ── Lineage Group ──
+
+
+class LineageGroup(BaseModel):
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    repo_id: str
+    name: str
+    description: str = ""
+    root_commit_ids: list[str] = Field(default_factory=list)
+    auto_detected: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# ── Challenge ──
+
+
+class Challenge(BaseModel):
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    score_id: str
+    commit_id: str
+    challenger_id: str
+    reason: str = ""
+    status: ChallengeStatus = ChallengeStatus.OPEN
+    verification_score: float | None = None
+    original_score: float | None = None
+    resolved_at: datetime | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# ── Webhook ──
+
+
+class Webhook(BaseModel):
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    repo_id: str
+    url: str
+    events: list[str] = Field(default_factory=list)
+    secret: str | None = None
+    active: bool = True
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# ── Event ──
+
+
+class Event(BaseModel):
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    repo_id: str
+    event_type: EventType
+    payload: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ── Manifest models ──
