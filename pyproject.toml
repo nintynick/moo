@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gitspoke"
+version = "0.1.0"
+description = "Eval-driven, branch-graph version control platform"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.1",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "docker>=7.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+gitspoke = "gitspoke.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gitspoke"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

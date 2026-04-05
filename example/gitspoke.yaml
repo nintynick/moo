@@ -1,0 +1,42 @@
+name: nanochat-optimization
+version: 1.0.0
+
+environment:
+  image: gitspoke.io/envs/pytorch-cuda:12.4
+  gpu: true
+
+build:
+  - uv sync
+  - uv run prepare.py
+
+metrics:
+  - name: val_bpb
+    type: lower-is-better
+    command: python eval.py --metric val_bpb
+    weight: 0.7
+  - name: throughput_tokens_per_sec
+    type: higher-is-better
+    command: python eval.py --metric throughput
+    weight: 0.3
+  - name: sample_quality
+    type: higher-is-better
+    command: python eval.py --metric sample_quality
+    weight: 0  # holdout metric — canary only
+
+constraints:
+  - name: all_tests_pass
+    command: python -m pytest tests/
+    type: must-pass
+  - name: max_memory
+    value: 24GB
+    type: resource-limit
+
+timeout: 600
+
+resources:
+  minimum:
+    gpu: nvidia-rtx-4090
+    memory: 32GB
+  recommended:
+    gpu: nvidia-h100
+    memory: 80GB
